@@ -1,0 +1,151 @@
+---
+title: "Pranav Kasela $846965$"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Arima Models
+
+```{r, message=FALSE}
+library(ggplot2)
+library(forecast)
+library(tidyverse)    
+```
+
+
+```{r}
+df <- read.csv2("time_series_dataset.csv", dec = ".")
+df$Data <- as.Date(df$Data)
+head(df)
+```
+
+```{r}
+#Trying Augmeted Dickey-Fuller test to see if the series is stationary:
+#$H_0$ is that the model is not stationary
+tseries::adf.test(df$value)
+
+train <- df[1:(nrow(df) - 365),] #last one year is for validation
+test  <- df[(nrow(df) - 365 + 1):nrow(df),]
+
+ggplot(data=train, aes(x=Data, y=value)) + 
+  geom_line()
+```
+
+```{r}
+#This is the function ggtsdisplay of forecast package, 
+#but it has been modified so is doesn't plot the series,
+#just the ACF and PACF plot, with the horizontal parameter 
+#the plot can be either horizontal or vertical
+#The function has been simplified a lot, since we don't need 
+#all the complexity the original one has.
+ggtsdisplay_2 <- function(x, lag.max, horizontal=TRUE, ...) {
+    if (!is.ts(x)) {
+      x <- ts(x)
+    }
+    if (missing(lag.max)) {
+      lag.max <- round(min(max(10 * log10(length(x)), 3 * frequency(x)), length(x) / 3))
+    }
+    ######      END   CHECKING    ########
+    
+    # Set up grid for plots
+    if (horizontal){
+      gridlayout <- matrix(c(2, 3), nrow = 1)
+    }
+    else{
+      gridlayout <- matrix(c(2, 3), nrow = 2)
+    }
+    grid::grid.newpage()
+    grid::pushViewport(grid::viewport(layout = grid::grid.layout(nrow(gridlayout), ncol(gridlayout))))
+    
+    # Prepare Acf plot
+    acfplot <- do.call(ggAcf, c(x = quote(x), lag.max = lag.max)) +
+      ggplot2::ggtitle("ACF") + ggplot2::ylab(NULL)
+
+    # Prepare last plot (variable)
+    pacfplot <- ggPacf(x, lag.max = lag.max) + ggplot2::ggtitle("PACF") +
+      ggplot2::ylab(NULL)
+    # Match y-axis
+    acfplotrange <- ggplot2::layer_scales(acfplot)$y$range$range
+    pacfplotrange <- ggplot2::layer_scales(pacfplot)$y$range$range
+    yrange <- range(c(acfplotrange, pacfplotrange))
+    acfplot <- acfplot + ggplot2::ylim(yrange)
+    pacfplot <- pacfplot + ggplot2::ylim(yrange)
+
+    # Add ACF plot
+    matchidx <- as.data.frame(which(gridlayout == 2, arr.ind = TRUE))
+    print(
+      acfplot,
+      vp = grid::viewport(
+        layout.pos.row = matchidx$row,
+        layout.pos.col = matchidx$col
+      )
+    )
+
+    # Add PACF plot
+    matchidx <- as.data.frame(which(gridlayout == 3, arr.ind = TRUE))
+    print(
+      pacfplot,
+      vp = grid::viewport(
+        layout.pos.row = matchidx$row,
+        layout.pos.col = matchidx$col
+      )
+    )
+  
+}
+
+ggtsdisplay_2(train$value, horizontal = TRUE, lag.max = 60)
+```
+Possiamo vedere che nel PACF vi sono 7 ritardi e il ritrado stagionale che scende esponenzialemente al settimo ritardo, indicando la presenza di un SMA$(1)_7$ e vedendo ACF dai primi 2 ritardi stagionali ci convinciamo dell'esistenza di SMA$(1)_7$, inoltre vi è presente anche un SAR$(1)_7$. Stagionalità 7 indica un periodo settimanale in questa serie. Inoltre vista la discesa lenta e non geometrica della ACF potrebbe suggerire l'esistenza di una integrazione stagionale. Iniziamo ad aggiungere la parte stagionale prima e cerchiamo di capire dai residui come andrebbe aggiustato il modello.
+```{r}
+mod1 <- Arima(train$value, c(0,0,0), list(order=c(1,0,1), period=7), lambda = "auto")
+ggtsdisplay_2(mod1$residuals)
+mod1
+```
+Vediamo anche che il coefficiente di SAR è molto vicino ad 1, quindi ha radice unitaria e ciò dice che esiste l'integrazione stagionale che sospettavamo prima.
+```{r}
+mod2 <- Arima(train$value, c(7,0,0), list(order=c(1,1,1), period=7), lambda = "auto")
+ggtsdisplay_2(mod2$residuals)
+```
+
+I residui sembrano essere rientrati nella banda tranne un residuo a 24 sia un ACF che PACF.
+
+```{r}
+plot(forecast(mod2, h=365), include = 40)
+lines(df$value, col="red")
+```
+
+Mettiamo regressori dummy mensili.
+
+```{r}
+#fr <- 2*pi*outer(1:nrow(df), 1:6)/12
+#co <- cos(fr)
+#si <- sin(fr[,1:5])
+#colnames(co) <- paste0("cos",1:6)
+#colnames(si) <- paste0("sin",1:5)
+#xreg <- cbind(co, si)
+
+#create dummy
+df %>%
+  mutate(month = months(df$Data), ind = 1) %>%
+  spread(month, ind, fill = 0) -> more_reg
+  #mutate(day = weekdays(df$Data), ind = 1) %>%
+  #spread(day, ind, fill = 0) 
+
+#xreg <- as.matrix(cbind(xreg, more_reg[3:(ncol(more_reg)-1)]))
+xreg <- as.matrix(more_reg[4:(ncol(more_reg)-1)])
+
+mod1_reg <- Arima(train$value, c(7,0,0), list(order=c(1,1,1), period=7), 
+              xreg=xreg[1:(nrow(df)-365),])
+ggtsdisplay_2(mod1_reg$residuals)
+```
+
+```{r}
+plot(forecast(mod1_reg, h=365, 
+              xreg=xreg[(nrow(df)-365+1):nrow(df),]), 
+     include = 40)
+lines(df$value, col="red")
+```
+
