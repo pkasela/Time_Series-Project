@@ -29,11 +29,13 @@ head(df)
 Splittiamo il dataset in train e test per verificare come va il modello su nuovi dati.
 
 ```{r}
-train <- df[1:(nrow(df) - 365),] #last one year is for validation
-test  <- df[(nrow(df) - 365 + 1):nrow(df),]
+idata <- ts(df$value, start=c(2010,1), frequency=365) 
+train <- window(idata, start=c(2010,1), end=c(2017,365))
+#train <- df[1:(nrow(df) - 365),] #last one year is for validation
+test <- window(idata, start=c(2018,1), end=c(2018,365))
+#test  <- df[(nrow(df) - 365 + 1):nrow(df),]
 
-ggplot(data=train, aes(x=Data, y=value)) + 
-  geom_line()
+autoplot(train)
 ```
 
 
@@ -99,18 +101,20 @@ ggtsdisplay_2 <- function(x, lag.max, horizontal=TRUE, ...) {
   
 }
 
-ggtsdisplay_2(train$value, horizontal = TRUE, lag.max = 60)
+ggtsdisplay_2(train, horizontal = TRUE, lag.max = 60)
 ```
 Possiamo vedere che nel PACF vi sono 7 ritardi e il ritrado stagionale che scende esponenzialemente al settimo ritardo, indicando la presenza di un SMA$(1)_7$ e vedendo ACF dai primi 2 ritardi stagionali ci convinciamo dell'esistenza di SMA$(1)_7$, inoltre vi è presente anche un SAR$(1)_7$. Stagionalità 7 indica un periodo settimanale in questa serie. Inoltre vista la discesa lenta e non geometrica della ACF potrebbe suggerire l'esistenza di una integrazione stagionale. Iniziamo ad aggiungere la parte stagionale prima e cerchiamo di capire dai residui come andrebbe aggiustato il modello.
 ```{r}
-mod1 <- Arima(train$value, c(0,0,0), list(order=c(1,0,1), period=7), lambda = "auto")
-ggtsdisplay_2(mod1$residuals)
+mod1 <- Arima(train, c(0,0,0), list(order=c(1,0,1), period=7), lambda = "auto")
+ggtsdisplay_2(mod1$residuals, lag.max = 40)
 mod1
 ```
 Vediamo anche che il coefficiente di SAR è molto vicino ad 1, quindi ha radice unitaria e ciò dice che esiste l'integrazione stagionale che sospettavamo prima.
+
 ```{r}
-mod2 <- Arima(train$value, c(6,0,0), list(order=c(1,1,1), period=7), lambda = "auto")
-ggtsdisplay_2(mod2$residuals, lag.max = 400)
+mod2 <- Arima(train, c(6,0,0), list(order=c(1,1,1), period=7), lambda = "auto")
+mod2
+ggtsdisplay_2(mod2$residuals, lag.max = 40)
 ```
 
 I residui sembrano essere rientrati nella banda tranne un residuo a 14 sia un ACF che PACF.
@@ -119,13 +123,22 @@ Usiamo il test Augmented Dickey-Fuller, che cerca radici unitarie nella serie, p
 ```{r}
 #Trying Augmeted Dickey-Fuller test to see if the series is stationary:
 #$H_0$ is that the model is not stationary
-tseries::adf.test(mod2$residuals, k=6)
+tseries::adf.test(mod2$residuals, k=7)
 ```
 Poiché il p-value è basso rifiutiamo l'$H_0$ e possiamo dire che i residui della sono stazionari. Questo è per il modello AR, mentre per SAR lo abbiamo già visto prima.
-
 ```{r}
-plot(forecast(mod2, h=365), include = 1000)
-lines(df$value, col="black")
+#Another way, it shows the roots
+autoplot(mod2)
+```
+
+```{r, fig.width=5}
+pred <- forecast(mod2, h=365)
+
+autoplot(window(idata, start=c(2016,1), end=c(2017,365))) +
+  autolayer(pred, ts.colour="black",series="Previsione", alpha=0.7) +
+  autolayer(test, series="Valori veri", alpha=0.6) +
+  xlab("Time") +
+  ylab("Valore")
 ```
 
 Mettiamo regressori dummy mensili e ogni 4 settimane.
@@ -142,30 +155,41 @@ data.frame(Data=df$Data) %>%
 #eliminiamo la prima e l'ultima colonna, per evitare multicollinearità
 xreg <- more_reg[,2:(ncol(more_reg)-1)] 
 
-mod1_reg <- Arima(train$value, c(6,0,0), list(order=c(1,1,1), period=7), 
-              xreg=xreg[1:(nrow(df)-365),], include.constant = TRUE, lambda = "auto")
-ggtsdisplay_2(mod1_reg$residuals, lag.max = 400)
+mod1_reg <- Arima(train, c(6,0,0), list(order=c(1,1,1), period=7), 
+              xreg=xreg[1:(length(train)),], include.constant = TRUE, lambda = "auto")
+ggtsdisplay_2(mod1_reg$residuals, lag.max = 40)
 ```
 
 ```{r}
-plot(forecast(mod1_reg, h=365, 
-              xreg=xreg[(nrow(df)-365+1):nrow(df),]), 
-     include = 1000)
-lines(forecast(mod2, h=365)$mean,col="red")
-lines(df$value, col="black")
+pred_reg <- forecast(mod1_reg, h=365, 
+              xreg=xreg[(length(train)+1):(length(train)+365),])
+autoplot(pred_reg)
+
+autoplot(window(idata, start=c(2017,1), end=c(2017,365))) +
+  autolayer(pred_reg,series="Previsione") +
+  autolayer(test, series="Valori veri", alpha=0.7)+
+  autolayer(forecast(train, h=365)$mean, alpha=0.5, series="Forecast(Default)") +
+  ylab("Valore")
 ```
 Questa serie presenta in realtà una multi-stagionalità, che non può essere risolta con R, per questo si prova ad usare regressori esterni, introducendo una stagionalità annuale e ogni 4 settimane. 
 
 ```{r}
 mod_reg_y <- forecast(mod1_reg, h=365, 
-                 xreg=xreg[(nrow(df)-365+1):nrow(df),])$mean
+                 xreg=xreg[(nrow(df)-365+1):(length(train)+365),])$mean
 mod2_y <- forecast(mod2, h=365)$mean
 
-mse_reg <- sqrt(((mean((test$value - mod_reg_y)/test$value))^2))
-mse_2   <- sqrt(((mean((test$value - mod2_y)/test$value))^2))
+mse_reg <- sqrt(mean((test - mod_reg_y)^2)) 
+mse_2   <- sqrt(mean((test - mod2_y)^2)) 
 
 print(paste0("MSE relativo modello senza regressori : ", mse_2))
 print(paste0("MSE relativo modello con regressori : ", mse_reg))
+
+ggplot() +
+  autolayer(test, series="Valori veri", size=1) +
+  autolayer(pred_reg$mean,series="XARIMA", size=0.7, alpha=0.8) +
+  autolayer(pred$mean,series="ARIMA", alpha=0.7)
+  #autolayer(forecast(train, h=365)$mean, alpha=0.7, series="Forecast") +
+  
 ```
 
 In realtà si nota che il modello performa peggio sul validation se vengono fornite regressori esterni per indicare il mese e la settimana, ciò è dovuto al fatto che nell'ultimo anno l'andamento è diverso dagli ultimi anni, oppure queste variabili non sono tanto esplicative quanto si credeva e aggiungono solo del rumore alla previsione.
@@ -174,15 +198,11 @@ In realtà si nota che il modello performa peggio sul validation se vengono forn
 
 ```{r, message=FALSE}
 library(KFAS)
-library(xts)
 ```
 
 ```{r}
-#y <- xts(df$value, df$Data)
-#ytrain <- y["2010-01-01/2017-12-31"]
-#plot(ytrain)
-ytrain <- train$value 
-ytrain[length(ytrain):(length(ytrain)+365)] <- NA
+ytrain <- as.numeric(train)
+ytrain[(length(ytrain)+1):(length(ytrain)+365)] <- NA
 ```
 
 ```{r}
@@ -221,30 +241,23 @@ lines(smo1$alphahat[1:(length(ytrain) -365), "level"] +
 ```
 
 ```{r}
-smo1 <- KFS(fit1$model, smoothing = c("state","disturbance","signal"))
-
-
-xarima_pred <- as.numeric(forecast(mod1_reg, h=365, 
-                 xreg=xreg[(nrow(df)-365+1):nrow(df),])$mean)
-
-arima_pred  <- as.numeric(forecast(mod2, h=365)$mean)
-
-
-test %>%
-  mutate(UCM = smo1$muhat[(nrow(df)-365 +1):nrow(df)],
-         XARIMA = xarima_pred, ARIMA = arima_pred) %>%
+df[((length(train)+1):length(ytrain)),] %>%
+  mutate(UCM = smo1$muhat[(length(train)+1):length(ytrain)],
+         XARIMA = as.numeric(pred_reg$mean), 
+         ARIMA = as.numeric(pred$mean)) %>%
   ggplot(aes(x=Data)) + 
-  geom_line(aes(y=value, col="Real")) +
-  geom_line(aes(y=UCM, col="UCM")) +
-  geom_line(aes(y=ARIMA, col="ARIMA"), linetype="F1") +
-  geom_line(aes(y=XARIMA, col="XARIMA")) +
-  scale_color_manual(values= c("Real"="black",
+  geom_line(aes(y=value ,col="Real")) +
+  #geom_line(aes(y=ARIMA, col="ARIMA"), linetype="F1") +
+  geom_line(aes(y=XARIMA, col="XARIMA"), alpha=0.7) +
+  geom_line(aes(y=UCM, col="UCM"), alpha=0.6) +
+  scale_color_manual(name = "Model",
+                     values= c("Real"="black",
                                "UCM"="darkred",
-                               "ARIMA"="blue",
-                               "XARIMA"="green")) +
+                               #"ARIMA"="blue",
+                               "XARIMA"="blue")) +
   theme_bw()
 
-mse_ucm   <- sqrt(((mean((test$value - smo1$muhat[(nrow(df)-365 +1):nrow(df)])/test$value))^2))
+mse_ucm   <- sqrt(mean((test - smo1$muhat[(length(train)+1):length(ytrain)])^2))
 
 print(paste0("MSE relativo modello ARIMA : ", mse_2))
 print(paste0("MSE relativo modello XARIMA : ", mse_reg))
