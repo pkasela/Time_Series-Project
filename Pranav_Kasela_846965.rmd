@@ -19,9 +19,13 @@ library(tidyverse)
 
 
 ```{r}
-df <- read.csv2("time_series_dataset.csv", dec = ".")
-df$Data <- as.Date(df$Data)
+in_df <- read.csv2("time_series_dataset.csv", dec = ".")
+in_df$Data <- as.Date(in_df$Data)
 head(df)
+
+in_df[in_df$Data=="2012-02-29" | in_df$Data=="2016-02-29",] 
+#remove the leap year dates
+df <- in_df[-which(in_df$Data=="2012-02-29" | in_df$Data=="2016-02-29"),] 
 ```
 
 # Arima Models
@@ -33,11 +37,9 @@ idata <- ts(df$value, start=c(2010,1), frequency=365)
 train <- window(idata, start=c(2010,1), end=c(2017,365))
 #train <- df[1:(nrow(df) - 365),] #last one year is for validation
 test <- window(idata, start=c(2018,1), end=c(2018,365))
-#test  <- df[(nrow(df) - 365 + 1):nrow(df),]
 
-autoplot(train)
+autoplot(cbind(train, test)) + ylab("value")
 ```
-
 
 ```{r}
 #This is the function ggtsdisplay of forecast package, 
