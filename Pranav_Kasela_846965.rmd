@@ -107,14 +107,14 @@ ggtsdisplay_2(train, horizontal = TRUE, lag.max = 60)
 ```
 Possiamo vedere che nel PACF vi sono 7 ritardi e il ritrado stagionale che scende esponenzialemente al settimo ritardo, indicando la presenza di un SMA$(1)_7$ e vedendo ACF dai primi 2 ritardi stagionali ci convinciamo dell'esistenza di SMA$(1)_7$, inoltre vi è presente anche un SAR$(1)_7$. Stagionalità 7 indica un periodo settimanale in questa serie. Inoltre vista la discesa lenta e non geometrica della ACF potrebbe suggerire l'esistenza di una integrazione stagionale. Iniziamo ad aggiungere la parte stagionale prima e cerchiamo di capire dai residui come andrebbe aggiustato il modello.
 ```{r}
-mod1 <- Arima(train, c(0,0,0), list(order=c(1,0,1), period=7), lambda = "auto")
+mod1 <- Arima(train, c(0,0,0), list(order=c(1,1,1), period=7), lambda = "auto")
 ggtsdisplay_2(mod1$residuals, lag.max = 40)
 mod1
 ```
 Vediamo anche che il coefficiente di SAR è molto vicino ad 1, quindi ha radice unitaria e ciò dice che esiste l'integrazione stagionale che sospettavamo prima.
 
 ```{r}
-mod2 <- Arima(train, c(6,0,0), list(order=c(1,1,1), period=7), lambda = "auto")
+mod2 <- Arima(train, c(6,1,6), list(order=c(1,1,1), period=7), lambda = "auto")
 mod2
 ggtsdisplay_2(mod2$residuals, lag.max = 40)
 ```
@@ -137,7 +137,7 @@ autoplot(mod2)
 pred <- forecast(mod2, h=365)
 
 autoplot(window(idata, start=c(2016,1), end=c(2017,365))) +
-  autolayer(pred, ts.colour="black",series="Previsione", alpha=0.7) +
+  autolayer(pred,series="Previsione", alpha=0.7) +
   autolayer(test, series="Valori veri", alpha=0.6) +
   xlab("Time") +
   ylab("Valore")
