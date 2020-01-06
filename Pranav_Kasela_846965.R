@@ -6,7 +6,7 @@ if (!require("data.table")) install.packages('data.table')
 if (!require("timeDate")) install.packages('timeDate')
 if (!require("xts")) install.packages('xts')
 
-df <- read.csv2("/home/pranav/Desktop/time_series_project/time_series_dataset.csv", dec = ".")
+df <- read.csv2("/home/pranav/Desktop/time_series_project/data/time_series_dataset.csv", dec = ".")
 df$Data <- as.Date(df$Data)
 
 idata <- xts(df$value, start=c(2010,1), order.by=df$Data) 
