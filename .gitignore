@@ -1,2 +1,5 @@
 .Rhistory
 .ipynb_checkpoints
+
+*.log
+*.aux
