@@ -27,7 +27,7 @@ Per confrontare tale metodologie verrà utilizzata la metrica MAPE e confronto v
 Dal dataset l'ultimo anno e mezzo viene tenuto separato (Figura \ref{fig:series}), esso fungerà da validation set sul quale verranno confrontati le varie metodologie di previsione.
 Come metrica è stata scelta MAPE perché più facile da capire da un punto di vista umano, si poteva benissimo scegliere anche la MSE o la MAE.
 Mentre per il confronto nelle metodologie stesse, i.e., modelli con diversi iper-parametri o architetture si sceglieranno delle metriche diverse, e verranno dette quando si spiega ciascun modello.
-
+%test è quello che verrà usato alla fine dai prof....
 \section*{ARIMA}
 Si usa la classe xts per definire la serie temporale (xts perché la serie è giornaliera nei vari anni), plottando ACF e PACF (Figura \ref{fig:ACF_1}) si vede immediatamente l'esistenza di tutte tre componenti stagionali con stagionalità 7: AR$(1)_7$I$(1)_7$MA$(1)_7$ poiché si vede una discesa geometrica (ogni 7 giorni) nel grafico della PACF e una discesa lineare (ogni 8 giorni) nel grafico della ACF, l'esistenza della parte di integrazione stagionale si può vedere anche facendo un modello SARMA$(1,1)_7$ e vedendo che il coefficiente di SAR risulta essere molto vicino ad 1. 
 \begin{figure}[!h]
@@ -113,7 +113,7 @@ Il miglior modello è il primo, nella Figura \ref{fig:LSTM_pred} vengono mostrat
   \caption{Previsione su alcuni elementi del validation usando LSTM.}
   \label{fig:LSTM_pred}
 \end{figure}
-
+%no way to use regressors in prediction easily
 \section*{Conclusion}
 I risultati delle tre metodologie sono:
 
@@ -130,6 +130,7 @@ I risultati delle tre metodologie sono:
   \caption{Confronto dei risultati ottenuti dalle tre metodologie }
   \label{tab:confronto}
 \end{table}
-%reallenamento modello per previsione sul test
+% reallenamento modello per previsione sul test
+
 
 \end{document}
