@@ -63,8 +63,13 @@ Si opta per il primo modello che non usa regressori per le vacanze visto che ott
   \label{fig:XARIMA_pred}
 \end{figure}\\
 Nella figura \ref{fig:XARIMA_pred} si vede subito i regressori trigonometrici annua spiegano molta varianza del modello.\\
-Nel primo modello se si provano a vedere i residui si vede che qualche picco sul ACF e PACF esce fuori (anche se di poco) dagli intervalli, e anche il test di Ljung-Box non rifiuta l'ipotesi nulla di non autocorrelazione al $95\%$, quindi i residui non WN, ma in una serie con dati reali è molto difficile arrivare a residui che sono perfettamente un WN, un cosa che può notare è che i residui sono distribuiti come un normale con media 0.
-%
+Nel modello finale con regressori trigonometrici se si provano a vedere i residui si vede che qualche picco sul ACF e PACF esce fuori (anche se di poco) dagli intervalli, e anche il test di Ljung-Box non rifiuta l'ipotesi nulla di non autocorrelazione al $95\%$, quindi i residui non sono un WN, ma in una serie con dati reali è molto difficile arrivare a residui che sono perfettamente un WN, un cosa che può notare è che i residui sono distribuiti abbastanza come un normale con media 0 (Figura \ref{fig:res}).
+\begin{figure}[!h]
+  \centering
+  \includegraphics[width=\linewidth,height=6cm]{imgs/arima_res.png}
+  \caption{Residui del modello ARIMA.}
+  \label{fig:res}
+\end{figure}
 \section*{UCM}
 Usando le considerazioni fatte per l'ARIMA si usa un modello UCM con un local linear trend, una componente stagionale settimanale stocastica con dummy e una componente stagionale stocastica annua con 24 regressori trigonometrici.
 Si provano due modelli: il primo usando i regressori per le vacanze costruite per l'ARIMA e il secondo senza l'ausilio di questi regressori.
@@ -119,7 +124,7 @@ Il miglior modello è il secondo, nella Figura \ref{fig:LSTM_pred} vengono mostr
   \caption{Previsione su alcuni elementi del validation usando LSTM.}
   \label{fig:LSTM_pred}
 \end{figure}\\
-Nei modelli LSTM non è possibile usare direttamente regressori esterni (se non introdotti come una serie che farebbero riferimento a qualcosa nel passato), un modo per provare a inserire regressori esterni è creare un altro layer di input con questi regressori e concatenarli al modello dopo i layer LSTM, ma se si prova a fare una predizione 334 passi avanti, aumentano il numero dei neuroni e delle connessioni e quindi aumenta anche il numero dei dati richiesti per l'allenamento, inoltre se non hanno dato informazioni (anzi hanno solo peggiorato le performance) nei modelli ARIMA e UCM, è stato reputato inutile provare ad aggiungere questi regressori al modello.
+Nei modelli LSTM non è possibile usare direttamente regressori esterni (se non introdotti come una serie che farebbero riferimento a qualcosa nel passato), un modo per provare a inserire regressori esterni è creare un altro layer di input con questi regressori e concatenarli al modello dopo i layer LSTM, ma se si prova a fare una predizione 334 passi avanti, aumentano il numero dei neuroni e delle connessioni e quindi aumenta anche il numero dei dati richiesti per l'allenamento, inoltre visto che non hanno dato informazioni aggiuntive (anzi hanno solo peggiorato le performance) nei modelli ARIMA e UCM, è stato reputato inutile provare ad aggiungere questi regressori al modello.
 \section*{Conclusioni}
 I risultati delle tre metodologie sono:
 \begin{table}[!h]
@@ -136,17 +141,17 @@ I risultati delle tre metodologie sono:
   \label{tab:confronto}
 \end{table}\\
 Le performance delle varie metodologie non sono molto diverse tra di solo, quindi colgono più o meno le stesse informazioni dai dati, il modello che riesce a tirar fuori più informazioni è l'ARIMA, seguito dal modello LSTM.\\
-Per le previsioni sul test i dati del train e validation vengono riuniti e si ri-allenano i modelli utilizzando i dati totali, per il modello della rete neurale il modello viene semplicemente allenato per altre 100 epoche sui dati del validation, 100 epoche servono per dare un po' di peso in più ai dati del validation che sono più recenti.
-Si nota che nelle previsioni sul test set \ref{fig:test_pred} le previsioni di UCM e ARIMA sono molto simili ma la rete LSTM tende a ritardare la discesa dei prezzi, quindi si crede che nel testing la rete LSTM avrà performance peggiori rispetto ai due modelli lineari: Negli ultimi anni l'andamento dei prezzi è diverso, i modelli lineari riescono quindi ad adattarsi velocemente ai nuovi dati mentre nell'allenamento la rete LSTM non fa differenza tra i dati vecchi o nuovi e cerca di minimizzare l'errore sulla serie globale quindi il nuovo andamento dipende in egual misura sia da dati recenti che dati vecchi da cui si spiega l'andamento diverso del modello LSTM dai modelli ARIMA e UCM.
+Per le previsioni sul test i dati del train e validation vengono riuniti e si ri-allenano i modelli utilizzando i dati totali, per il modello della rete neurale il modello viene semplicemente allenato per altre 100 epoche sui dati del validation, per dare un po' di peso in più ai dati del validation che sono più recenti.\\
+Si nota che nelle previsioni sul test set, raffigurate nella Figura \ref{fig:test_pred}, le previsioni di UCM e ARIMA sono molto simili ma la rete LSTM tende a ritardare la discesa dei prezzi, quindi si crede che nel testing la rete LSTM avrà performance anche molto diverse rispetto ai due modelli lineari: Negli ultimi anni l'andamento dei prezzi è diverso, i modelli lineari riescono quindi ad adattarsi velocemente ai nuovi dati mentre nell'allenamento la rete LSTM non fa differenza tra i dati vecchi o nuovi e cerca di minimizzare l'errore sulla serie globale quindi il nuovo andamento dipende in egual misura sia da dati recenti che dati vecchi da cui si spiega l'andamento diverso del modello LSTM dai modelli ARIMA e UCM.
 \begin{figure}[!h]
   \centering
   \includegraphics[width=\linewidth,height=8cm]{imgs/test_results.png}
   \caption{Previsioni finali per il test.}
   \label{fig:test_pred}
 \end{figure}\\
-La `facilità' dei modelli come le reti neurali è che essi riescono a cogliere la maggior parte delle varie stagionalità e trend da soli se il numero di dati è sufficientemente grande, ad esempio nel caso di studio le stagionalità e il trend vengono colte molto bene, mentre nei modello lineari classici bisogna studiare la serie `a mano' e aggiustare le componenti del modello.\\
+La `facilità' dei modelli come le reti neurali è che essi riescono a cogliere la maggior parte delle varie stagionalità e trend da soli se il numero di dati è sufficientemente grande, ad esempio nel caso di studio le stagionalità e il trend vengono colte molto bene, il modello LSTM mentre nei modello lineari classici bisogna studiare la serie `a mano' e aggiustare le componenti del modello.\\
 Un modo per poter sfruttare la potenza di entrambi potrebbe essere quello di studiare un modello lineare classico prima e usare un modello RNN sui residui del primo modello, in modo da lasciar apprendere alla RNN ciò che non si è riusciti a spiegare nel modello classico (ammesso che ci sia qualcosa ancora da spiegare) oppure il viceversa.
-Si possono usare altri modelli per lo studio dei residui come i modelli GARCH (per spiegare le varianze) che in questo caso potrebbe essere più utile visto che il test di Ljung-Box ha rigettato l'$H_0$ dell'indipendenza dei residui e la varianza degli errori sembra oscillare nel tempo (e il logaritmo non riesce a schiaccarla).\\
+Si possono usare altri modelli per lo studio dei residui come i modelli GARCH (per spiegare le varianze) che in questo caso potrebbe essere più utile visto che il test di Ljung-Box ha rigettato l'$H_0$ della non dipendenza dei residui e la varianza degli errori sembra oscillare nel tempo (e il logaritmo non riesce a schiaccarla).\\
 Provando ad usare una rete LSTM in questo caso sui residui del modello ARIMA, in realtà, prevede valori talmente bassi da poter essere considerati tutto trascurabili, cioè il modello non riesce a tirar fuori nessuna informazione aggiuntiva significativa.
 
 
