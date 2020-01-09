@@ -151,7 +151,6 @@ Si nota che nelle previsioni sul test set, raffigurate nella Figura \ref{fig:tes
 \end{figure}\\
 La `facilità' dei modelli come le reti neurali è che essi riescono a cogliere la maggior parte delle varie stagionalità e trend da soli se il numero di dati è sufficientemente grande, ad esempio nel caso di studio le stagionalità e il trend vengono colte molto bene, il modello LSTM mentre nei modello lineari classici bisogna studiare la serie `a mano' e aggiustare le componenti del modello.\\
 Un modo per poter sfruttare la potenza di entrambi potrebbe essere quello di studiare un modello lineare classico prima e usare un modello RNN sui residui del primo modello, in modo da lasciar apprendere alla RNN ciò che non si è riusciti a spiegare nel modello classico (ammesso che ci sia qualcosa ancora da spiegare) oppure il viceversa.
-Si possono usare altri modelli per lo studio dei residui come i modelli GARCH (per spiegare le varianze) che in questo caso potrebbe essere più utile visto che il test di Ljung-Box ha rigettato l'$H_0$ della non dipendenza dei residui e la varianza degli errori sembra oscillare nel tempo (e il logaritmo non riesce a schiaccarla).\\
 Provando ad usare una rete LSTM in questo caso sui residui del modello ARIMA, in realtà, prevede valori talmente bassi da poter essere considerati tutto trascurabili, cioè il modello non riesce a tirar fuori nessuna informazione aggiuntiva significativa.
 
 
